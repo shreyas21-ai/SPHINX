@@ -1,0 +1,38 @@
+
+# Python virtual environments
+.venv/
+sphinx-backend/venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets and environment variables
+.env
+.env.*
+!.env.example
+
+# Local database and patient data
+sphinx-backend/instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# React dependencies and build output
+sphinx-frontend/node_modules/
+sphinx-frontend/dist/
+
+# Logs
+*.log
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build output log
+sphinx-frontend/build_out.txt
