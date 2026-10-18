@@ -32,9 +32,12 @@ class SearchService:
         ngram_token_pairs = []
 
         # Determine target fields to search
-        searchable_fields = ['disease', 'diagnosis', 'allergies', 'treatment_plan', 'prescription', 'name', 'blood_group']
+        searchable_fields = ['disease', 'diagnosis', 'allergies', 'treatment_plan', 'prescription', 'name', 'first_name', 'last_name', 'blood_group']
         if target_field and target_field in searchable_fields:
-            fields_to_search = [target_field]
+            if target_field in ['name', 'first_name', 'last_name']:
+                fields_to_search = ['name', 'first_name', 'last_name']
+            else:
+                fields_to_search = [target_field]
         else:
             fields_to_search = ['disease', 'diagnosis', 'allergies', 'name', 'blood_group']
 
@@ -63,15 +66,25 @@ class SearchService:
                     ngram_token_pairs.append((ng, field_name))
 
         matching_record_ids: Set[int] = set()
+        matching_patient_ids: Set[int] = set()
 
         if search_type == 'EXACT':
             matching_record_ids = SearchRepository.find_matching_record_ids_by_exact_tokens(exact_token_pairs)
+            matching_patient_ids = SearchRepository.find_matching_patient_ids_by_tokens(exact_token_pairs)
         else:
             matching_record_ids = SearchRepository.find_matching_record_ids_by_exact_tokens(exact_token_pairs)
             if not matching_record_ids and ngram_token_pairs:
                 matching_record_ids = SearchRepository.find_matching_record_ids_by_ngram_tokens(ngram_token_pairs)
 
-        matching_patient_ids = SearchRepository.find_matching_patient_ids_by_tokens(exact_token_pairs + ngram_token_pairs)
+            matching_patient_ids = SearchRepository.find_matching_patient_ids_by_tokens(exact_token_pairs)
+            if not matching_patient_ids and ngram_token_pairs:
+                matching_patient_ids = SearchRepository.find_matching_patient_ids_by_ngram_tokens(ngram_token_pairs)
+
+        # Include medical records belonging to matching patients
+        if matching_patient_ids:
+            records_for_patients = MedicalRecordRepository.get_by_patient_ids(list(matching_patient_ids))
+            patient_record_ids = {r.id for r in records_for_patients}
+            matching_record_ids.update(patient_record_ids)
 
         # Enforce Doctor patient authorization scope
         if role_name == Role.DOCTOR and user_id and purpose != 'EMERGENCY':

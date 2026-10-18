@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   Grid, Card, CardContent, Typography, Box, Button, CircularProgress,
   Paper, Divider, Chip, Avatar, Skeleton, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow
+  TableContainer, TableHead, TableRow, Alert, AlertTitle, Collapse, IconButton
 } from '@mui/material';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import PeopleIcon from '@mui/icons-material/People';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import EventIcon from '@mui/icons-material/Event';
@@ -54,6 +57,8 @@ export const DashboardPage = () => {
   const [stats, setStats] = useState(null);
   const [patientsList, setPatientsList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [alerts, setAlerts] = useState(null);
+  const [alertsExpanded, setAlertsExpanded] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -66,6 +71,13 @@ export const DashboardPage = () => {
           const patRes = await api.get('/patients').catch(() => ({ data: { data: [] } }));
           if (patRes.data?.status === 'success') {
             setPatientsList(patRes.data.data || []);
+          }
+        }
+        // Fetch security alerts for ADMIN only
+        if (role === 'ADMIN') {
+          const alertRes = await api.get('/dashboard/alerts').catch(() => null);
+          if (alertRes?.data?.status === 'success') {
+            setAlerts(alertRes.data.data);
           }
         }
       } catch (err) {
@@ -659,6 +671,120 @@ export const DashboardPage = () => {
           />
         </Grid>
       </Grid>
+
+      {/* ── Security Alert Panel (ADMIN only) ── */}
+      {alerts !== null && (
+        <Card
+          variant="outlined"
+          sx={{
+            mb: 3,
+            borderColor: alerts.total_alerts > 0 ? 'warning.main' : 'success.main',
+            bgcolor: alerts.total_alerts > 0 ? 'warning.50' : 'success.50'
+          }}
+        >
+          <CardContent>
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+              <Box display="flex" alignItems="center" gap={1}>
+                <WarningAmberIcon
+                  color={alerts.total_alerts > 0 ? 'warning' : 'success'}
+                />
+                <Typography variant="h6" fontWeight="700">
+                  Security Activity Alerts
+                </Typography>
+                <Chip
+                  label={alerts.total_alerts === 0 ? 'No Alerts' : `${alerts.total_alerts} Active`}
+                  color={alerts.total_alerts > 0 ? 'warning' : 'success'}
+                  size="small"
+                />
+              </Box>
+              <IconButton
+                size="small"
+                onClick={() => setAlertsExpanded(prev => !prev)}
+                aria-label="toggle alerts"
+              >
+                {alertsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Box>
+
+            <Collapse in={alertsExpanded}>
+              <Divider sx={{ my: 1.5 }} />
+
+              {/* Summary row */}
+              <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
+                <Chip size="small" label={`Failed Logins: ${alerts.summary.repeated_failed_logins}`} color={alerts.summary.repeated_failed_logins > 0 ? 'error' : 'default'} />
+                <Chip size="small" label={`Excessive Searches: ${alerts.summary.excessive_searches}`} color={alerts.summary.excessive_searches > 0 ? 'warning' : 'default'} />
+                <Chip size="small" label={`Off-Hours Logins: ${alerts.summary.off_hours_logins}`} color={alerts.summary.off_hours_logins > 0 ? 'info' : 'default'} />
+                <Chip size="small" label="Large Downloads: N/A (no download endpoint)" color="default" />
+              </Box>
+
+              {alerts.total_alerts === 0 ? (
+                <Alert severity="success" sx={{ borderRadius: 2 }}>
+                  No active security alerts. All activity patterns are within normal parameters.
+                </Alert>
+              ) : (
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: 'action.hover' }}>
+                      <TableRow>
+                        <TableCell><strong>Severity</strong></TableCell>
+                        <TableCell><strong>Type</strong></TableCell>
+                        <TableCell><strong>User</strong></TableCell>
+                        <TableCell><strong>Role</strong></TableCell>
+                        <TableCell><strong>Detail</strong></TableCell>
+                        <TableCell><strong>Detection</strong></TableCell>
+                        <TableCell><strong>Recommendation</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {alerts.alerts.map((alert, idx) => (
+                        <TableRow key={idx} hover>
+                          <TableCell>
+                            <Chip
+                              label={alert.severity}
+                              size="small"
+                              color={alert.severity === 'HIGH' ? 'error' : alert.severity === 'MEDIUM' ? 'warning' : 'info'}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                            {alert.alert_type}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem' }}>{alert.user_email}</TableCell>
+                          <TableCell>
+                            <Chip label={alert.user_role} size="small" variant="outlined" />
+                          </TableCell>
+                          <TableCell sx={{ maxWidth: 260, fontSize: '0.8rem' }}>{alert.detail}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={alert.detection_method === 'ISOLATION_FOREST' ? 'ML: IsoForest' : 'Rule'}
+                              size="small"
+                              color={alert.detection_method === 'ISOLATION_FOREST' ? 'secondary' : 'default'}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                            {alert.recommendation}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+
+              {/* Limitation notice */}
+              {alerts.limitations?.length > 0 && (
+                <Alert severity="info" sx={{ mt: 1.5, borderRadius: 2, fontSize: '0.75rem' }}>
+                  <AlertTitle>Monitoring Limitation</AlertTitle>
+                  {alerts.limitations[0]}
+                </Alert>
+              )}
+
+              <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                Generated at: {alerts.generated_at ? new Date(alerts.generated_at).toLocaleString() : '—'}
+              </Typography>
+            </Collapse>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Analytics Charts */}
       <Grid container spacing={3}>

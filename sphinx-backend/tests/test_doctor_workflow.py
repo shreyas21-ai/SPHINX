@@ -45,12 +45,13 @@ def doctor_setup(app):
         # Create Unassigned Patient (no relation to Doc 1)
         pat_unassigned = PatientRepository_create_helper("UnassignedDoc1", "Patient")
 
+        from app.crypto.aes_cipher import AESCipher
         # Assign pat_assigned to Doc 1 via MedicalRecord
         mr = MedicalRecord(
             patient_id=pat_assigned.id,
             doctor_id=doc1_obj.id,
-            disease_enc=b'enc',
-            diagnosis_enc=b'enc'
+            disease_enc=AESCipher.encrypt("Initial Consultation"),
+            diagnosis_enc=AESCipher.encrypt("Routine Checkup")
         )
         db.session.add(mr)
         db.session.commit()

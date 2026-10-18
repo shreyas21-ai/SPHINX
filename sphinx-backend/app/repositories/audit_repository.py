@@ -59,3 +59,39 @@ class AuditRepository:
             'events_by_purpose': dict(purpose_counts),
             'events_by_role': dict(role_counts)
         }
+
+    @staticmethod
+    def get_off_hours_logins(off_hours_start: int = 20, off_hours_end: int = 7,
+                             lookback_days: int = 1) -> List[AuditLog]:
+        """
+        Returns LOGIN audit events that occurred outside normal working hours.
+        Normal hours are off_hours_end (07:00) to off_hours_start (20:00).
+        Events where hour >= off_hours_start OR hour < off_hours_end are flagged.
+        """
+        from datetime import timedelta
+        cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+        events = AuditLog.query.filter(
+            AuditLog.action == 'LOGIN',
+            AuditLog.timestamp >= cutoff
+        ).all()
+        flagged = []
+        for e in events:
+            h = e.timestamp.hour
+            if h >= off_hours_start or h < off_hours_end:
+                flagged.append(e)
+        return flagged
+
+    @staticmethod
+    def get_user_search_counts_today() -> dict:
+        """Returns {user_id: search_count} for all users with searches today."""
+        today_start = datetime.combine(date.today(), datetime.min.time())
+        rows = db.session.query(
+            AuditLog.user_id,
+            func.count(AuditLog.id).label('cnt')
+        ).filter(
+            AuditLog.action.like('%SEARCH%'),
+            AuditLog.timestamp >= today_start,
+            AuditLog.user_id.isnot(None)
+        ).group_by(AuditLog.user_id).all()
+        return {row.user_id: row.cnt for row in rows}
+

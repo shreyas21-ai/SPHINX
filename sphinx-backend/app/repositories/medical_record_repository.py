@@ -23,6 +23,12 @@ class MedicalRecordRepository:
         return MedicalRecord.query.filter(MedicalRecord.id.in_(record_ids)).all()
 
     @staticmethod
+    def get_by_patient_ids(patient_ids: List[int]) -> List[MedicalRecord]:
+        if not patient_ids:
+            return []
+        return MedicalRecord.query.filter(MedicalRecord.patient_id.in_(patient_ids)).all()
+
+    @staticmethod
     def create(record: MedicalRecord) -> MedicalRecord:
         db.session.add(record)
         db.session.commit()

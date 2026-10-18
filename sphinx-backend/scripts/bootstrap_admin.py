@@ -121,7 +121,32 @@ def bootstrap():
                 'vitals': 'BP: 128/82 mmHg, Heart Rate: 72 bpm, BMI: 27.4'
             }, doctor_id=doctor.id)
 
-            print("Sample encrypted patients and medical records seeded successfully!")
+            # Create sample appointment with doctor and nurse
+            from datetime import datetime, timedelta
+            AppointmentService.create_appointment({
+                'patient_public_id': p1['public_id'],
+                'doctor_public_id': doctor.public_id,
+                'nurse_public_id': created_users[Role.NURSE].public_id,
+                'appointment_date': (datetime.utcnow() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S'),
+                'reason': 'Routine Endocrinology Follow-up'
+            })
+
+            # Create sample billing claim for Insurance Officer
+            from app.services.billing_service import BillingService
+            BillingService.create_billing_claim({
+                'patient_public_id': p1['public_id'],
+                'items': [
+                    {'item_name': 'Endocrinology Consultation', 'quantity': 1, 'unit_price': 150.0},
+                    {'item_name': 'HbA1c Lab Panel', 'quantity': 1, 'unit_price': 75.0},
+                    {'item_name': 'Metformin 500mg Supply', 'quantity': 2, 'unit_price': 25.0}
+                ],
+                'approved_amount': 225.0,
+                'insurance_provider': 'BlueShield Healthcare',
+                'policy_number': 'POL-992811',
+                'claim_notes': 'Primary consultation and routine lab panel covered under chronic disease benefit.'
+            }, officer_id=created_users[Role.INSURANCE_OFFICER].id)
+
+            print("Sample encrypted patients, medical records, appointments, and billing claims seeded successfully!")
 
         print("\n====================================================")
         print("Project SPHINX Bootstrap Completed Successfully!")

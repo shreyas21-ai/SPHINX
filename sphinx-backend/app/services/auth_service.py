@@ -9,12 +9,30 @@ from app.utils.exceptions import BadRequestException, UnauthorizedException, Not
 class AuthService:
     @staticmethod
     def authenticate_user(email: str, password: str) -> dict:
+        from app.extensions import db
         user = UserRepository.get_by_email(email)
+
+        # Track failed attempts before raising — always look up by email
         if not user or not user.check_password(password):
+            if user:
+                # Increment failed counter and persist safely
+                try:
+                    user.failed_login_count = (user.failed_login_count or 0) + 1
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
             raise UnauthorizedException("Invalid email or password.")
 
         if not user.is_active:
             raise UnauthorizedException("User account is disabled.")
+
+        # Successful login: reset failure counter and record timestamp
+        try:
+            user.failed_login_count = 0
+            user.last_login_at = datetime.utcnow()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
         identity = str(user.id)
         access_token = create_access_token(identity=identity)

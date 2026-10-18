@@ -17,6 +17,10 @@ class User(db.Model):
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
 
+    # Activity monitoring fields
+    failed_login_count = db.Column(db.Integer, default=0, nullable=False)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+
     reset_token = db.Column(db.String(255), nullable=True)
     reset_token_expires = db.Column(db.DateTime, nullable=True)
 

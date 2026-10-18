@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, Card, CardContent, Typography, TextField, Button, MenuItem,
   Grid, Chip, Alert, CircularProgress, Divider, Paper
@@ -8,11 +9,13 @@ import KeyIcon from '@mui/icons-material/Key';
 import SpeedIcon from '@mui/icons-material/Speed';
 import HistoryIcon from '@mui/icons-material/History';
 import ShieldIcon from '@mui/icons-material/Shield';
+import PersonIcon from '@mui/icons-material/Person';
 import api from '../services/api';
 import { usePurpose } from '../contexts/PurposeContext';
 import { PrivacyAwareRecordView } from '../components/PrivacyAwareRecordView';
 
 export const SecureSearchPage = () => {
+  const navigate = useNavigate();
   const { purpose, requirePurposeConfirmation } = usePurpose();
 
   const [query, setQuery] = useState('');
@@ -65,6 +68,12 @@ export const SecureSearchPage = () => {
     e.preventDefault();
     requirePurposeConfirmation(() => {
       executeSearch();
+    });
+  };
+
+  const handleViewPatient = (public_id) => {
+    requirePurposeConfirmation(() => {
+      navigate(`/patients/${public_id}`);
     });
   };
 
@@ -233,13 +242,68 @@ export const SecureSearchPage = () => {
           {results.medical_records?.length === 0 && results.patients?.length === 0 ? (
             <Alert severity="warning">No encrypted records matched the specified HMAC token query.</Alert>
           ) : (
-            <Box>
-              <Typography variant="h6" fontWeight="700" mb={2}>
-                Decrypted Search Results ({results.medical_records?.length || 0})
-              </Typography>
-              {results.medical_records?.map((rec) => (
-                <PrivacyAwareRecordView key={rec.public_id} record={rec} />
-              ))}
+            <Box display="flex" flexDirection="column" gap={3}>
+              {/* Patient Matches */}
+              {results.patients?.length > 0 && (
+                <Box>
+                  <Typography variant="h6" fontWeight="700" mb={2}>
+                    Matching Patient Profiles ({results.patients.length})
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {results.patients.map((pat) => (
+                      <Grid item xs={12} sm={6} key={pat.public_id}>
+                        <Card variant="outlined" sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <Box>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                              <Box display="flex" alignItems="center" gap={1}>
+                                <PersonIcon color="primary" />
+                                <Typography variant="subtitle1" fontWeight="700" color="primary.main">
+                                  {pat.first_name} {pat.last_name}
+                                </Typography>
+                              </Box>
+                              <Chip label={pat.blood_group || 'Unknown'} size="small" color="primary" variant="outlined" />
+                            </Box>
+                            <Typography variant="caption" color="text.secondary" fontFamily="monospace" display="block" mb={1}>
+                              Public ID: #{pat.public_id?.substring(0, 8)}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              DOB & Gender: {pat.dob === '[REDACTED_PRIVACY_POLICY]' ? 'Redacted' : `${pat.dob} (${pat.gender})`}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Phone: {pat.phone || 'N/A'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Insurance: {pat.insurance_provider || 'None'}
+                            </Typography>
+                          </Box>
+                          <Box mt={2}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              fullWidth
+                              onClick={() => handleViewPatient(pat.public_id)}
+                            >
+                              View Patient Profile
+                            </Button>
+                          </Box>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+
+              {/* Medical Record Matches */}
+              {results.medical_records?.length > 0 && (
+                <Box>
+                  <Typography variant="h6" fontWeight="700" mb={2}>
+                    Decrypted Medical Records ({results.medical_records.length})
+                  </Typography>
+                  {results.medical_records.map((rec) => (
+                    <PrivacyAwareRecordView key={rec.public_id} record={rec} />
+                  ))}
+                </Box>
+              )}
             </Box>
           )}
         </Box>
